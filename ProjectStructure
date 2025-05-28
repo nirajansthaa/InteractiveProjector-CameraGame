@@ -1,23 +1,11 @@
 projector-game/
 │
 ├── main.py                        # Main entry point
-├── config/
-│   └── settings.py               # Configs: camera ID, HSV range, homography points, etc.
 │
-├── detection/
-│   ├── object_tracker.py         # Object (ball/pointer) detection logic
-│   ├── hit_detector.py           # Logic for checking hits against hit zones
-│   └── homography.py             # Handles camera↔projector coordinate transformation
-│
-├── game/
-│   ├── hit_zones.py              # Defines and manages hit zones
-│   ├── events.py                 # Hit triggers, score update, game logic
-│   └── visualizer.py             # Overlay hit zones and debug visuals on frames
-│
-├── utils/
-│   ├── smoothing.py              # Optional: smoothing for object tracking
-│   ├── camera_selection.py             
-│   └── timer.py                  # Debounce or delay logic
+├── modules/
+│   ├── edge_detection.py              
+│   ├── game.py             
+│   └── hit_detection.py                 
 │
 ├── assets/                       # Store reference images, calibration photos, etc.
 │
