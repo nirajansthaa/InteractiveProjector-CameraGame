@@ -22,7 +22,8 @@ while True:
     if not ret:
         print("❌ Failed to grab frame")
         break
-
+    
+    
     cv2.imshow(f"Camera {camera_index} Feed", frame)
 
     key = cv2.waitKey(1)
