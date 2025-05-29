@@ -4,9 +4,17 @@ projector-game/
 │
 ├── modules/
 │   ├── edge_detection.py              
-│   ├── game.py             
-│   └── hit_detection.py                 
+│   ├── game_visual.py 
+│   └── circle_detection.py 
+│
+├── test/
+│   ├── edge_detection_test.py              
+│   ├── game_visual_test.py 
+│   └── circle_detection_test.py                
 │
 ├── assets/                       # Store reference images, calibration photos, etc.
+│   ├── balloon1.png              
+│   ├── balloon2.png 
+│   └── balloon3.png
 │
 └── README.md                     # Project overview

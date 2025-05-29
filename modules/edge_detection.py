@@ -1,8 +1,17 @@
-# detection/edge_detection.py
 import cv2
 import numpy as np
 
 def load_and_detect_edges(image_paths, resize=(300, 300)):
+    """
+    Load images and detect edges using Canny edge detection.
+    
+    Args:
+        image_paths (list): List of paths to input images.
+        resize (tuple): Target size for resizing images (width, height).
+    
+    Returns:
+        list: List of dictionaries containing original image, grayscale, edges, and path.
+    """
     edge_results = []
 
     for path in image_paths:
