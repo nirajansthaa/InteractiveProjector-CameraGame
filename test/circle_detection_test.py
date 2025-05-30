@@ -28,7 +28,7 @@ def test_circle_detection():
             break
 
         # Detect circles in the frame
-        frame = detect_circles_in_frame(
+        _, frame = detect_circles_in_frame(
             frame,
             callback=sample_callback,
             min_radius=30,

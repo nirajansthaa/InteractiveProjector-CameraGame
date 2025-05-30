@@ -26,8 +26,8 @@ class Calibration:
                 cap.release()
                 return None
             frame = cv2.flip(frame, 1)
-            cv2.putText(frame, "Press 'c' to capture, 'q' to quit", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            # cv2.putText(frame, "Press 'c' to capture, 'q' to quit", (10, 30),
+            #            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.imshow("Live Feed - Press 'c' to capture", frame)
             key = cv2.waitKey(1) & 0xFF
             if key == ord('c'):

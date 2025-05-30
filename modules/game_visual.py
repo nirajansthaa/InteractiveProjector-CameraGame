@@ -17,7 +17,7 @@ class Balloon:
         self.alive = True
         self.popped = False
         self.pop_timer = 0
-        self.pop_cooldown = 5
+        self.pop_cooldown = 1
         self.image = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)  # RGBA
         if self.image is None:
             raise ValueError(f"Could not load image: {img_path}")

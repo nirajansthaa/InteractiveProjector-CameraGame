@@ -70,7 +70,7 @@ def run_balloon_pop_game():
             balloon.draw(frame, show_bbox=False)
         
         # Detect circles and draw them on the same frame
-        circles = detect_circles_in_frame(
+        circles, frame = detect_circles_in_frame(
             frame,
             min_radius=30,
             max_radius=50,

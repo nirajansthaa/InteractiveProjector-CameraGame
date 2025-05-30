@@ -25,8 +25,8 @@ def detect_circles_in_frame(frame, callback=None, min_radius=30, max_radius=50, 
     frame_processing = frame.copy()
     hsv = cv2.cvtColor(frame_processing, cv2.COLOR_BGR2HSV)
 
-    lower_yellow = np.array([156, 93, 137]) #np.array([20, 100, 100])
-    upper_yellow = np.array([171, 255, 255])
+    lower_yellow = np.array([38, 45, 41])#np.array([27, 84, 31]) #np.array([156, 93, 137]) #np.array([20, 100, 100])
+    upper_yellow = np.array([140, 252, 255]) #np.array([99, 158, 255]) #np.array([171, 255, 255])
 
     # Create a Mask for Yellow Color
     mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
@@ -89,4 +89,4 @@ def detect_circles_in_frame(frame, callback=None, min_radius=30, max_radius=50, 
             cv2.circle(frame, (x, y), r, (0, 255, 255), 3)  # Yellow circle (BGR: Blue=0, Green=255, Red=255)
             cv2.circle(frame, (x, y), 2, (0, 0, 255), 3)  # Red center for clarity
 
-    return circles
+    return circles, frame
