@@ -1,50 +1,69 @@
 import cv2
 import numpy as np
 
-def load_and_detect_edges(image_paths, resize=(300, 300)):
-    """
-    Load images and detect edges using Canny edge detection.
-    
-    Args:
-        image_paths (list): List of paths to input images.
-        resize (tuple): Target size for resizing images (width, height).
-    
-    Returns:
-        list: List of dictionaries containing original image, grayscale, edges, and path.
-    """
-    edge_results = []
+class EdgeDetector:
+    def __init__(self, low_threshold=50, high_threshold=150):
+        """
+        Initialize edge detector with Canny thresholds.
+        
+        Args:
+            low_threshold (int): Lower threshold for Canny edge detection
+            high_threshold (int): Upper threshold for Canny edge detection
+        """
+        self.low_threshold = low_threshold
+        self.high_threshold = high_threshold
 
-    for path in image_paths:
-        image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    def detect_edges(self, image_path):
+        """
+        Detect edges in an image using Canny edge detection.
+        
+        Args:
+            image_path (str): Path to input image
+            
+        Returns:
+            numpy.ndarray: Edge-detected image
+        """
+        # Read the image
+        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         if image is None:
-            print(f"Error: Could not load {path}")
-            continue
+            raise ValueError(f"Could not load image at {image_path}")
 
-        # Resize image
-        image = cv2.resize(image, resize)
+        # Apply Gaussian blur to reduce noise
+        blurred = cv2.GaussianBlur(image, (5, 5), 0)
+        
+        # Perform Canny edge detection
+        edges = cv2.Canny(blurred, self.low_threshold, self.high_threshold)
+        
+        return edges
 
-        # Extract RGB and alpha if present
-        if image.shape[2] == 4:
-            bgr = image[:, :, :3]
-            alpha = image[:, :, 3]
-        else:
-            bgr = image
-            alpha = None
+    def detect_edges_from_array(self, image_array):
+        """
+        Detect edges from a NumPy array (e.g., camera frame).
+        
+        Args:
+            image_array (numpy.ndarray): Input image as a NumPy array (grayscale)
+            
+        Returns:
+            numpy.ndarray: Edge-detected image
+        """
+        if image_array is None or len(image_array.shape) != 2:
+            raise ValueError("Invalid input: Expected grayscale image array")
+        
+        # Apply Gaussian blur to reduce noise
+        blurred = cv2.GaussianBlur(image_array, (5, 5), 0)
+        
+        # Perform Canny edge detection
+        edges = cv2.Canny(blurred, self.low_threshold, self.high_threshold)
+        
+        return edges
 
-        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-
-        # Mask with alpha to suppress transparent regions
-        if alpha is not None:
-            gray = cv2.bitwise_and(gray, gray, mask=alpha)
-
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, 50, 150)
-
-        edge_results.append({
-            'original': bgr,
-            'gray': gray,
-            'edges': edges,
-            'path': path
-        })
-
-    return edge_results
+    def adjust_thresholds(self, low_threshold, high_threshold):
+        """
+        Adjust Canny edge detection thresholds.
+        
+        Args:
+            low_threshold (int): New lower threshold
+            high_threshold (int): New upper threshold
+        """
+        self.low_threshold = low_threshold
+        self.high_threshold = high_threshold
