@@ -187,7 +187,7 @@ def main():
         start_time = time.time()
         while time.time() - start_time < 120:  # Run for 120 seconds
             # Reset game screen
-            game_screen[:] = 0  # Clear to black
+            game_screen[:] = 255  # Clear to black
             
             # Update and draw balloons
             for balloon in balloons:
@@ -213,7 +213,7 @@ def main():
             edges = detector.detect_edges_from_array(gray_frame)
             
             # Display warped feed and edges
-            # cv2.imshow("Warped Camera Feed", warped_frame)
+            cv2.imshow("Warped Camera Feed", warped_frame)
             cv2.imshow("Camera Edges", edges)
             
             # Check for 'q' to quit or 'r' to recalibrate

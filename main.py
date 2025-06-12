@@ -120,6 +120,14 @@ except pygame.error as e:
     print(f"Warning: Failed to load pop.wav: {e}. No pop sound.")
     pop_sound = None
 
+try:
+    boom_path = os.path.join(base_dir, "assets", 'boom.png')
+    boom_img = pygame.image.load(boom_path).convert_alpha()
+    boom_img = pygame.transform.scale(boom_img, (260, 150))
+except pygame.error as e:
+    print(f"Warning: Failed to load boom.png: {e}. No boom image.")
+    boom_img = None
+
 # Colors and fonts
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -133,6 +141,7 @@ class Balloon:
         self.width = self.image.get_width()
         self.height = self.image.get_height()
         self.popped = False
+        self.pop_time = None
         self.reset()
 
     def reset(self):
@@ -142,7 +151,10 @@ class Balloon:
         self.popped = False
 
     def update(self):
-        if not self.popped:
+        if self.popped:
+            if time.time() - self.pop_time >= 0.3:
+                self.reset()
+        else:
             self.y -= self.speed
             if self.y + self.height < 0:
                 self.reset()
@@ -192,6 +204,19 @@ class Balloon:
             return True
         return False
 
+class CrackEffect:
+    def __init__(self, x, y, duration=0.3):
+        self.x = x
+        self.y = y
+        self.start_time = time.time()
+        self.duration = duration
+
+    def draw(self, win):
+        if boom_img and time.time() - self.start_time < self.duration:
+            win.blit(boom_img, (self.x, self.y))
+            return True
+        return False
+    
 def perform_calibration(cap):
     calibration_points = get_calibration_points(cap)
     if calibration_points and len(calibration_points) == 4:
@@ -222,7 +247,8 @@ else:
         sys.exit(1)
 
 # Initialize game variables
-balloons = [Balloon() for _ in range(3)]
+balloons = [Balloon() for _ in range(4)]
+cracks = []
 score = 0
 start_time = pygame.time.get_ticks()
 game_over = False
@@ -240,6 +266,8 @@ while running:
         continue
     # frame = cv2.resize(frame, (SCREEN_WIDTH, SCREEN_HEIGHT))
     warped_frame = cv2.warpPerspective(frame, transform_matrix, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    # Apply light Gaussian blur to reduce noise
+    warped_frame = cv2.GaussianBlur(warped_frame, (5, 5), 0)
     
     if background_frame is None:
         background_frame = cv2.cvtColor(warped_frame, cv2.COLOR_BGR2GRAY)
@@ -310,10 +338,11 @@ while running:
             if b.check_circle_occlusion(object_mask, detected_circles, detector, warped_frame):
                 if pop_sound:
                     pop_sound.play()
-            if b.popped:
-                b.reset()
+                cracks.append(CrackEffect(b.x, b.y))
+                score += 1
             b.update()
             b.draw(WIN)
+        cracks = [c for c in cracks if c.draw(WIN)]
         timer_text = FONT.render(f"Time Left: {time_left}s", True, BLACK)
         score_text = FONT.render(f"Score: {score}", True, BLACK)
         draw_text_with_bg(WIN, timer_text, 20, 20)

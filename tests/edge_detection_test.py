@@ -11,7 +11,7 @@ def main():
     input_image = "input.jpg"  # Replace with your image path
     # Load assets
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    balloon_files = ["balloon1.png", "balloon2.png", "balloon3.png"]
+    balloon_files = ["balloon1.png", "balloon2.png", "balloon3.png", 'balloon4.png']
     for file in balloon_files:
         path = os.path.join(base_dir, "assets", file)
         try:

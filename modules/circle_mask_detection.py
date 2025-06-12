@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def get_circle_mask(frame, background, threshold=30, min_radius=20, max_radius=150, color_lower=(38, 45, 41), color_upper=(140, 252, 255)):
+def get_circle_mask(frame, background, threshold=30, min_radius=20, max_radius=150, color_lower=(47, 56, 103), color_upper=(69, 139, 255)):
     """
     Enhanced object mask that specifically detects circular objects
     """
@@ -40,7 +40,7 @@ def get_circle_mask(frame, background, threshold=30, min_radius=20, max_radius=1
         dp=1,
         minDist=50,  # Minimum distance between circle centers
         param1=50,   # Upper threshold for edge detection
-        param2=25,   # Accumulator threshold for center detection
+        param2=45,   # Accumulator threshold for center detection
         minRadius=min_radius,
         maxRadius=max_radius
     )
