@@ -1,0 +1,28 @@
+{
+  "points": [
+    [
+      320.0,
+      270.0
+    ],
+    [
+      743.0,
+      313.0
+    ],
+    [
+      734.0,
+      538.0
+    ],
+    [
+      296.0,
+      535.0
+    ]
+  ],
+  "offset_x": 280,
+  "offset_y": 125,
+  "debug_offset_x": 0,
+  "debug_offset_y": 0,
+  "screen_width": 1360,
+  "screen_height": 768,
+  "timestamp": 1749815578.9159322,
+  "version": "2.2"
+}
