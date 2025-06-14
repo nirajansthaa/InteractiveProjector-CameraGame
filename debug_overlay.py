@@ -24,7 +24,7 @@ FPS = 60
 CONF_THRESHOLD = 0.5
 IOU_THRESHOLD = 0.7
 CLICK_COOLDOWN = 0.5
-MODEL_PATH = "best.onnx"
+MODEL_PATH = "best1.onnx"
 CRACK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "boom1.png")
 CALIBRATION_FILE = "calibration.json"
 
