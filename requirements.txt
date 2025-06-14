@@ -1,1 +1,5 @@
 opencv-python
+pyautogui
+pygame
+screeninfo
+ultralytics
