@@ -6,6 +6,7 @@ import json
 import os
 import time
 import logging
+from collections import deque
 from modules.calibration import *
 
 # Suppress Ultralytics logging
@@ -25,9 +26,12 @@ FPS = 60
 CONF_THRESHOLD = 0.5
 IOU_THRESHOLD = 0.7
 CLICK_COOLDOWN = 0.5
-MODEL_PATH = "best.onnx"
+MODEL_PATH = "best1.onnx"
 CRACK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "boom1.png")
 CALIBRATION_FILE = "calibration.json"
+HIT_ZONE_Y = SCREEN_HEIGHT * 0.9  # Bottom 10% of screen as hit zone
+VELOCITY_THRESHOLD = 50  # Pixels per second for velocity reversal
+TRACKING_FRAMES = 5  # Number of frames to track ball position
 
 # Initialize Pygame
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
@@ -74,22 +78,22 @@ calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y = load_ca
 transform_matrix = None
 if calibration_points and len(calibration_points) == 4:
     print(f"Loading existing calibration with homography offset ({offset_x}, {offset_y}) and debug offset ({debug_offset_x}, {debug_offset_y})...")
-    transform_matrix = get_perspective_transform(calibration_points, 0, 0)
+    transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
     test_calibration_accuracy(transform_matrix, calibration_points)
 else:
     print("Performing camera calibration...")
     calibration_points = get_calibration_points(cap)
-    offset_x, offset_y = 0, 0  # Set homography offset to 0,0
-    debug_offset_x, debug_offset_y = 280, 125  # Set debug offset to 280, 125
+    offset_x, offset_y = 280, 125
+    debug_offset_x, debug_offset_y = 0, 0
     if calibration_points and len(calibration_points) == 4:
         save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
-        transform_matrix = get_perspective_transform(calibration_points, 0, 0)
+        transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
         test_calibration_accuracy(transform_matrix, calibration_points)
     else:
         print("Error: Calibration failed")
         cap.release()
         pygame.quit()
-        sys.exit()
+        sys.exit(1)
 
 # Crack effect class
 class CrackEffect:
@@ -111,6 +115,9 @@ last_click_time = 0
 running = True
 show_debug_overlay = False
 font = pygame.font.SysFont(None, 36)
+ball_positions = deque(maxlen=TRACKING_FRAMES)  # Store (x, y, timestamp) for tracking
+last_hit_time = 0  # Track last hit to debounce
+hit_debounce = 1.0  # Seconds to wait before allowing another hit
 
 # Main loop
 while running:
@@ -130,37 +137,61 @@ while running:
     
     # Process detections
     current_time = time.time()
+    detected_ball = False
     for result in results:
         if result.boxes:
             for box in result.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 cx = (x1 + x2) / 2
                 cy = (y1 + y2) / 2
-                if (0 <= cx <= SCREEN_WIDTH and 0 <= cy <= SCREEN_HEIGHT and 
-                    current_time - last_click_time >= CLICK_COOLDOWN):
-                    crack_x = int(cx - crack_img.get_width() / 2 + debug_offset_x)
-                    crack_y = int(cy - crack_img.get_height() / 2 + debug_offset_y)
-                    cracks.append(CrackEffect(crack_x, crack_y))
-                    last_click_time = current_time
+                if 0 <= cx <= SCREEN_WIDTH and 0 <= cy <= SCREEN_HEIGHT:
+                    detected_ball = True
+                    # Store position and timestamp
+                    ball_positions.append((cx, cy, current_time))
+                    # Check for hit condition
+                    if (len(ball_positions) >= TRACKING_FRAMES and 
+                        cy > HIT_ZONE_Y and 
+                        current_time - last_hit_time >= hit_debounce):
+                        # Calculate vertical velocity (y difference over time)
+                        prev_pos = ball_positions[-TRACKING_FRAMES]
+                        dy = cy - prev_pos[1]
+                        dt = current_time - prev_pos[2]
+                        if dt > 0:
+                            velocity_y = dy / dt  # Pixels per second
+                            # Check for velocity reversal (downward to upward)
+                            if velocity_y < -VELOCITY_THRESHOLD:  # Negative indicates upward
+                                # Verify previous velocity was downward
+                                mid_pos = ball_positions[-TRACKING_FRAMES//2]
+                                mid_dy = mid_pos[1] - prev_pos[1]
+                                mid_dt = mid_pos[2] - prev_pos[2]
+                                if mid_dt > 0 and mid_dy / mid_dt > 0:  # Downward
+                                    crack_x = int(cx - crack_img.get_width() / 2)
+                                    crack_y = int(cy - crack_img.get_height() / 2)
+                                    cracks.append(CrackEffect(crack_x, crack_y))
+                                    last_hit_time = current_time
+                                    print(f"Hit detected at ({cx:.1f}, {cy:.1f}) with velocity {velocity_y:.1f} px/s")
+                    break  # Process only the first detected ball
+    
+    # Clear positions if no ball detected to avoid stale data
+    if not detected_ball:
+        ball_positions.clear()
     
     # Debug view
     debug_view = warped_frame.copy()
-    # Draw ROI boundary
-    roi_points = np.float32([[0, 0], [SCREEN_WIDTH-1, 0], [SCREEN_WIDTH-1, SCREEN_HEIGHT-1], [0, SCREEN_HEIGHT-1]])
-    roi_points = roi_points.astype(np.int32).reshape((-1, 1, 2))
-    cv2.polylines(debug_view, [roi_points], True, (255, 0, 0), 2)
     for result in results:
         if result.boxes:
             for box in result.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                cx = (x1 + x2) / 2 + debug_offset_x
-                cy = (y1 + y2) / 2 + debug_offset_y
+                cx = (x1 + x2) / 2
+                cy = (y1 + y2) / 2
                 confidence = float(box.conf[0])
                 cv2.rectangle(debug_view, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.circle(debug_view, (int(cx), int(cy)), 5, (0, 0, 255), -1)
                 cv2.putText(debug_view, f"Green Ball: {confidence:.2f}", (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
     
+    # Draw hit zone in debug view
+    cv2.line(debug_view, (0, int(HIT_ZONE_Y)), (SCREEN_WIDTH, int(HIT_ZONE_Y)), (255, 0, 0), 2)
     cv2.putText(debug_view, f"Screen: {SCREEN_WIDTH}x{SCREEN_HEIGHT}", (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
     cv2.putText(debug_view, f"Homography Offset: ({offset_x}, {offset_y})", (10, 60),
@@ -180,7 +211,7 @@ while running:
                 print("Starting recalibration...")
                 calibration_points = get_calibration_points(cap)
                 if calibration_points and len(calibration_points) == 4:
-                    offset_x, offset_y = 280, 125
+                    offset_x, offset_y = 0, 0
                     debug_offset_x, debug_offset_y = 0, 0
                     save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
                     transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
@@ -232,16 +263,21 @@ while running:
                     cx = (x1 + x2) / 2 + debug_offset_x
                     cy = (y1 + y2) / 2 + debug_offset_y
                     pygame.draw.circle(screen, (255, 0, 0), (int(cx), int(cy)), 5)
-                    pygame.draw.rect(screen, (0, 255, 0), (x1, y1, x2 - x1, y2 - y1), 2)
-    
-    # Display offsets
+                    pygame.draw.rect(screen, (0, 255, 0),
+                                     (x1 + debug_offset_x, y1 + debug_offset_y,
+                                      x2 - x1, y2 - y1), 2)
+        dst_points = np.float32([[0, 0], [SCREEN_WIDTH-1, 0], [SCREEN_WIDTH-1, SCREEN_HEIGHT-1], [0, SCREEN_HEIGHT-1]])
+        for i, pt in enumerate(dst_points):
+            pygame.draw.circle(screen, (0, 255, 255),
+                               (int(pt[0] + debug_offset_x), int(pt[1] + debug_offset_y)), 10)
+            pygame.draw.circle(screen, (255, 255, 255),
+                               (int(pt[0] + debug_offset_x), int(pt[1] + debug_offset_y)), 10, 2)
     offset_text = font.render(f"Homography Offset: ({offset_x}, {offset_y})", True, (255, 255, 255))
     debug_offset_text = font.render(f"Debug Offset: ({debug_offset_x}, {debug_offset_y})", True, (255, 255, 255))
     screen.blit(offset_text, (10, 10))
     screen.blit(debug_offset_text, (10, 40))
     pygame.display.flip()
     
-    # Check for exit
     if cv2.waitKey(1) & 0xFF == ord('q'):
         running = False
 

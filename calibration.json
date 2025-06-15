@@ -1,28 +1,28 @@
 {
   "points": [
     [
-      222.0,
-      157.0
+      232.0,
+      202.0
     ],
     [
-      991.0,
-      72.0
+      761.0,
+      273.0
     ],
     [
-      1021.0,
-      565.0
+      756.0,
+      543.0
     ],
     [
-      283.0,
-      561.0
+      200.0,
+      553.0
     ]
   ],
   "offset_x": 0,
   "offset_y": 0,
-  "debug_offset_x": 0,
-  "debug_offset_y": 0,
+  "debug_offset_x": 280,
+  "debug_offset_y": 125,
   "screen_width": 1360,
   "screen_height": 768,
-  "timestamp": 1749872657.0369365,
+  "timestamp": 1749977414.5711017,
   "version": "2.2"
 }
