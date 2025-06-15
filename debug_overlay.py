@@ -406,7 +406,7 @@ while running:
                 print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
             elif event.key == pygame.K_p:
                 save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
-    
+        
     # Render screen
     screen.fill((0, 0, 0))
     for crack in cracks:

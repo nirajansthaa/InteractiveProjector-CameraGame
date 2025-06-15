@@ -1,4 +1,5 @@
 import pygame
+import pyautogui
 import cv2
 import numpy as np
 import sys
@@ -112,6 +113,9 @@ running = True
 show_debug_overlay = False
 font = pygame.font.SysFont(None, 36)
 
+# Compute inverse transform for manual clicks
+inv_transform_matrix = np.linalg.inv(transform_matrix)
+
 # Main loop
 while running:
     clock.tick(FPS)
@@ -138,8 +142,20 @@ while running:
                 cy = (y1 + y2) / 2
                 if (0 <= cx <= SCREEN_WIDTH and 0 <= cy <= SCREEN_HEIGHT and 
                     current_time - last_click_time >= CLICK_COOLDOWN):
+                    # screen_x = int(cx + debug_offset_x)
+                    # screen_y = int(cy + debug_offset_y)
+                    screen_x = int(cx + debug_offset_x + external_screen.x)
+                    screen_y = int(cy + debug_offset_y + external_screen.y)
+
+                    # Move the mouse and click
+                    pyautogui.moveTo(screen_x, screen_y)
+                    pyautogui.click(button='right')
+
+                    # Still show the visual crack effect for feedback
                     crack_x = int(cx - crack_img.get_width() / 2 + debug_offset_x)
                     crack_y = int(cy - crack_img.get_height() / 2 + debug_offset_y)
+                    cracks.append(CrackEffect(crack_x, crack_y))
+
                     cracks.append(CrackEffect(crack_x, crack_y))
                     last_click_time = current_time
     
@@ -218,7 +234,17 @@ while running:
                 print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
             elif event.key == pygame.K_p:
                 save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
-    
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+            if current_time - last_click_time >= CLICK_COOLDOWN:
+                mx, my = event.pos
+                point = np.float32([[[mx, my]]])
+                warped_point = cv2.perspectiveTransform(point, inv_transform_matrix)[0][0]
+                cx, cy = warped_point
+                if 0 <= cx <= SCREEN_WIDTH and 0 <= cy <= SCREEN_HEIGHT:
+                    crack_x = int(cx - crack_img.get_width() / 2)
+                    crack_y = int(cy - crack_img.get_height() / 2)
+                    cracks.append(CrackEffect(crack_x, crack_y))
+                    last_click_time = current_time
     # Render screen
     screen.fill((0, 0, 0))
     for crack in cracks:
