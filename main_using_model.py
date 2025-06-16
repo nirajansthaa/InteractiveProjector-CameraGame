@@ -21,7 +21,7 @@ cv2.setLogLevel(0)
 
 from ultralytics import YOLO
 
-# Constants
+# Constantsq
 SCREEN_WIDTH = 1360
 SCREEN_HEIGHT = 768
 FPS = 60

@@ -81,7 +81,7 @@ else:
     print("Performing camera calibration...")
     calibration_points = get_calibration_points(cap)
     offset_x, offset_y = 0, 0  # Set homography offset to 0,0
-    debug_offset_x, debug_offset_y = 280, 125  # Set debug offset to 280, 125
+    debug_offset_x, debug_offset_y = 0, 0  # Set debug offset to 280, 125
     if calibration_points and len(calibration_points) == 4:
         save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
         transform_matrix = get_perspective_transform(calibration_points, 0, 0)
@@ -196,12 +196,12 @@ while running:
                 print("Starting recalibration...")
                 calibration_points = get_calibration_points(cap)
                 if calibration_points and len(calibration_points) == 4:
-                    offset_x, offset_y = 280, 125
+                    offset_x, offset_y = 0, 0
                     debug_offset_x, debug_offset_y = 0, 0
                     save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
                     transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
                     test_calibration_accuracy(transform_matrix, calibration_points)
-            elif event.key == pygame.K_d:
+            elif event.key == pygame.K_f:
                 show_debug_overlay = not show_debug_overlay
                 print(f"Debug overlay: {'ON' if show_debug_overlay else 'OFF'}")
             elif event.key == pygame.K_LEFT:

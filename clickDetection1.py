@@ -1,5 +1,4 @@
 import pygame
-import pyautogui
 import cv2
 import numpy as np
 import sys
@@ -29,7 +28,6 @@ CLICK_COOLDOWN = 0.5
 MODEL_PATH = "best.onnx"
 CRACK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "boom1.png")
 CALIBRATION_FILE = "calibration.json"
-CAMERA_INDEX = 1  # Configurable camera index
 
 # Initialize Pygame
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
@@ -63,9 +61,9 @@ except Exception as e:
     sys.exit(1)
 
 # Initialize camera
-cap = cv2.VideoCapture(CAMERA_INDEX)
+cap = cv2.VideoCapture(1)
 if not cap.isOpened():
-    print(f"Error: Could not open camera at index {CAMERA_INDEX}")
+    print("Error: Could not open camera")
     pygame.quit()
     sys.exit(1)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -114,9 +112,6 @@ running = True
 show_debug_overlay = False
 font = pygame.font.SysFont(None, 36)
 
-# Compute inverse transform for manual clicks
-inv_transform_matrix = np.linalg.inv(transform_matrix)
-
 # Main loop
 while running:
     clock.tick(FPS)
@@ -143,17 +138,14 @@ while running:
                 cy = (y1 + y2) / 2
                 if (0 <= cx <= SCREEN_WIDTH and 0 <= cy <= SCREEN_HEIGHT and 
                     current_time - last_click_time >= CLICK_COOLDOWN):
-                    screen_x = int(cx + debug_offset_x + external_screen.x)
-                    screen_y = int(cy + debug_offset_y + external_screen.y)
-                    pyautogui.moveTo(screen_x, screen_y)
-                    pyautogui.click(button='right')
-                    crack_x = int(cx - crack_img.get_width() / 2)
-                    crack_y = int(cy - crack_img.get_height() / 2)
+                    crack_x = int(cx - crack_img.get_width() / 2 + debug_offset_x)
+                    crack_y = int(cy - crack_img.get_height() / 2 + debug_offset_y)
                     cracks.append(CrackEffect(crack_x, crack_y))
                     last_click_time = current_time
     
     # Debug view
     debug_view = warped_frame.copy()
+    # Draw ROI boundary
     roi_points = np.float32([[0, 0], [SCREEN_WIDTH-1, 0], [SCREEN_WIDTH-1, SCREEN_HEIGHT-1], [0, SCREEN_HEIGHT-1]])
     roi_points = roi_points.astype(np.int32).reshape((-1, 1, 2))
     cv2.polylines(debug_view, [roi_points], True, (255, 0, 0), 2)
@@ -161,8 +153,8 @@ while running:
         if result.boxes:
             for box in result.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                cx = (x1 + x2) / 2
-                cy = (y1 + y2) / 2
+                cx = (x1 + x2) / 2 + debug_offset_x
+                cy = (y1 + y2) / 2 + debug_offset_y
                 confidence = float(box.conf[0])
                 cv2.rectangle(debug_view, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.circle(debug_view, (int(cx), int(cy)), 5, (0, 0, 255), -1)
@@ -188,62 +180,18 @@ while running:
                 print("Starting recalibration...")
                 calibration_points = get_calibration_points(cap)
                 if calibration_points and len(calibration_points) == 4:
-                    offset_x, offset_y = 0, 0
+                    offset_x, offset_y = 280, 125
                     debug_offset_x, debug_offset_y = 0, 0
                     save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
                     transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
                     test_calibration_accuracy(transform_matrix, calibration_points)
-            elif event.key == pygame.K_f:
+            elif event.key == pygame.K_d:
                 show_debug_overlay = not show_debug_overlay
                 print(f"Debug overlay: {'ON' if show_debug_overlay else 'OFF'}")
-            elif event.key == pygame.K_LEFT:
-                offset_x -= 5
-                transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
-                print(f"Adjusted homography offset to ({offset_x}, {offset_y})")
-            elif event.key == pygame.K_RIGHT:
-                offset_x += 5
-                transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
-                print(f"Adjusted homography offset to ({offset_x}, {offset_y})")
-            elif event.key == pygame.K_UP:
-                offset_y -= 5
-                transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
-                print(f"Adjusted homography offset to ({offset_x}, {offset_y})")
-            elif event.key == pygame.K_DOWN:
-                offset_y += 5
-                transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
-                print(f"Adjusted homography offset to ({offset_x}, {offset_y})")
-            elif event.key == pygame.K_w:
-                debug_offset_y -= 5
-                print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
-            elif event.key == pygame.K_s:
-                debug_offset_y += 5
-                print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
-            elif event.key == pygame.K_a:
-                debug_offset_x -= 5
-                print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
-            elif event.key == pygame.K_d:
-                debug_offset_x += 5
-                print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
-            elif event.key == pygame.K_p:
-                save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
-    
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
-            if current_time - last_click_time >= CLICK_COOLDOWN:
-                mx, my = event.pos
-                point = np.float32([[[mx, my]]])
-                warped_point = cv2.perspectiveTransform(point, inv_transform_matrix)[0][0]
-                cx, cy = warped_point
-                if 0 <= cx <= SCREEN_WIDTH and 0 <= cy <= SCREEN_HEIGHT:
-                    crack_x = int(cx - crack_img.get_width() / 2)
-                    crack_y = int(cy - crack_img.get_height() / 2)
-                    cracks.append(CrackEffect(crack_x, crack_y))
-                    last_click_time = current_time
-    
+           
     # Render screen
     screen.fill((0, 0, 0))
     for crack in cracks:
-
-
         crack.draw(screen)
     cracks = [c for c in cracks if c.draw(screen)]
     if show_debug_overlay:
@@ -251,8 +199,8 @@ while running:
             if result.boxes:
                 for box in result.boxes:
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    cx = (x1 + x2) / 2
-                    cy = (y1 + y2) / 2
+                    cx = (x1 + x2) / 2 + debug_offset_x
+                    cy = (y1 + y2) / 2 + debug_offset_y
                     pygame.draw.circle(screen, (255, 0, 0), (int(cx), int(cy)), 5)
                     pygame.draw.rect(screen, (0, 255, 0), (x1, y1, x2 - x1, y2 - y1), 2)
     
