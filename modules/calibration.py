@@ -2,11 +2,14 @@
 import cv2
 import numpy as np
 import time, json
+from screeninfo import get_monitors
+
 # Constants
+CALIBRATION_FILE = "calibration.json"
+monitors = get_monitors()
+external_screen = monitors[1]
 SCREEN_WIDTH = 1360
 SCREEN_HEIGHT = 768
-CALIBRATION_FILE = "calibration.json"
-
 
 def order_points(pts):
     pts = np.array(pts, dtype=np.float32)
@@ -169,17 +172,17 @@ def load_calibration_points(filename=CALIBRATION_FILE):
 def get_perspective_transform(src_points, offset_x=0, offset_y=0):
     dst_points = np.float32([
         [0 + offset_x, 0 + offset_y],
-        [SCREEN_WIDTH-1 + offset_x, 0 + offset_y],
-        [SCREEN_WIDTH-1 + offset_x, SCREEN_HEIGHT-1 + offset_y],
-        [0 + offset_x, SCREEN_HEIGHT-1 + offset_y]
+        [external_screen.width-1 + offset_x, 0 + offset_y],
+        [external_screen.width-1 + offset_x, external_screen.height-1 + offset_y],
+        [0 + offset_x, external_screen.height-1 + offset_y]
     ])
     src_points = np.float32(src_points)
     matrix = cv2.getPerspectiveTransform(src_points, dst_points)
-    print("=== CALIBRATION QUALITY ===")
-    for i, (src, dst) in enumerate(zip(src_points, dst_points)):
-        transformed = cv2.perspectiveTransform(np.array([[src]], dtype=np.float32), matrix)[0][0]
-        error = np.linalg.norm(transformed - dst)
-        print(f"Corner {i+1}: Error = {error:.2f} pixels")
+    # print("=== CALIBRATION QUALITY ===")
+    # for i, (src, dst) in enumerate(zip(src_points, dst_points)):
+    #     transformed = cv2.perspectiveTransform(np.array([[src]], dtype=np.float32), matrix)[0][0]
+    #     error = np.linalg.norm(transformed - dst)
+    #     print(f"Corner {i+1}: Error = {error:.2f} pixels")
     return matrix
 
 def test_calibration_accuracy(transform_matrix, calibration_points):
