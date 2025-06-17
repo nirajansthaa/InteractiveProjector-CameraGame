@@ -76,16 +76,14 @@ transform_matrix = None
 if calibration_points and len(calibration_points) == 4:
     print(f"Loading existing calibration with homography offset ({offset_x}, {offset_y}) and debug offset ({debug_offset_x}, {debug_offset_y})...")
     transform_matrix = get_perspective_transform(calibration_points, 0, 0)
-    test_calibration_accuracy(transform_matrix, calibration_points)
 else:
     print("Performing camera calibration...")
     calibration_points = get_calibration_points(cap)
     offset_x, offset_y = 0, 0  # Set homography offset to 0,0
-    debug_offset_x, debug_offset_y = 0, 0  # Set debug offset to 280, 125
+    debug_offset_x, debug_offset_y = 0, 0  
     if calibration_points and len(calibration_points) == 4:
         save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
         transform_matrix = get_perspective_transform(calibration_points, 0, 0)
-        test_calibration_accuracy(transform_matrix, calibration_points)
     else:
         print("Error: Calibration failed")
         cap.release()
@@ -127,7 +125,7 @@ while running:
         continue
     
     # Apply perspective transform
-    warped_frame = cv2.warpPerspective(frame, transform_matrix, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    warped_frame = cv2.warpPerspective(frame, transform_matrix, (external_screen.width, external_screen.height))
     
     # Run YOLO detection
     results = model.predict(warped_frame, imgsz=640, conf=CONF_THRESHOLD, iou=IOU_THRESHOLD, device="cpu", verbose=False)
@@ -140,7 +138,7 @@ while running:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 cx = (x1 + x2) / 2
                 cy = (y1 + y2) / 2
-                if (0 <= cx <= SCREEN_WIDTH and 0 <= cy <= SCREEN_HEIGHT and 
+                if (0 <= cx <= external_screen.width and 0 <= cy <= external_screen.height and 
                     current_time - last_click_time >= CLICK_COOLDOWN):
                     # screen_x = int(cx + debug_offset_x)
                     # screen_y = int(cy + debug_offset_y)
@@ -149,20 +147,20 @@ while running:
 
                     # Move the mouse and click
                     pyautogui.moveTo(screen_x, screen_y)
-                    pyautogui.click(button='right')
+                    pyautogui.click(button='left')
 
                     # Still show the visual crack effect for feedback
                     crack_x = int(cx - crack_img.get_width() / 2 + debug_offset_x)
                     crack_y = int(cy - crack_img.get_height() / 2 + debug_offset_y)
                     cracks.append(CrackEffect(crack_x, crack_y))
-
-                    cracks.append(CrackEffect(crack_x, crack_y))
                     last_click_time = current_time
     
     # Debug view
     debug_view = warped_frame.copy()
+    debug_view = cv2.resize(warped_frame, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
     # Draw ROI boundary
-    roi_points = np.float32([[0, 0], [SCREEN_WIDTH-1, 0], [SCREEN_WIDTH-1, SCREEN_HEIGHT-1], [0, SCREEN_HEIGHT-1]])
+    roi_points = np.float32([[0, 0], [external_screen.width-1, 0], [external_screen.width-1, external_screen.height-1], [0, external_screen.height-1]])
     roi_points = roi_points.astype(np.int32).reshape((-1, 1, 2))
     cv2.polylines(debug_view, [roi_points], True, (255, 0, 0), 2)
     for result in results:
@@ -177,12 +175,6 @@ while running:
                 cv2.putText(debug_view, f"Green Ball: {confidence:.2f}", (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
     
-    cv2.putText(debug_view, f"Screen: {SCREEN_WIDTH}x{SCREEN_HEIGHT}", (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-    cv2.putText(debug_view, f"Homography Offset: ({offset_x}, {offset_y})", (10, 60),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-    cv2.putText(debug_view, f"Debug Offset: ({debug_offset_x}, {debug_offset_y})", (10, 90),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
     cv2.imshow("Camera Feed", debug_view)
     
     # Handle events
@@ -201,46 +193,14 @@ while running:
                     save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
                     transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
                     test_calibration_accuracy(transform_matrix, calibration_points)
-            elif event.key == pygame.K_f:
-                show_debug_overlay = not show_debug_overlay
-                print(f"Debug overlay: {'ON' if show_debug_overlay else 'OFF'}")
-            elif event.key == pygame.K_LEFT:
-                offset_x -= 5
-                transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
-                print(f"Adjusted homography offset to ({offset_x}, {offset_y})")
-            elif event.key == pygame.K_RIGHT:
-                offset_x += 5
-                transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
-                print(f"Adjusted homography offset to ({offset_x}, {offset_y})")
-            elif event.key == pygame.K_UP:
-                offset_y -= 5
-                transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
-                print(f"Adjusted homography offset to ({offset_x}, {offset_y})")
-            elif event.key == pygame.K_DOWN:
-                offset_y += 5
-                transform_matrix = get_perspective_transform(calibration_points, offset_x, offset_y)
-                print(f"Adjusted homography offset to ({offset_x}, {offset_y})")
-            elif event.key == pygame.K_w:
-                debug_offset_y -= 5
-                print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
-            elif event.key == pygame.K_s:
-                debug_offset_y += 5
-                print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
-            elif event.key == pygame.K_a:
-                debug_offset_x -= 5
-                print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
-            elif event.key == pygame.K_d:
-                debug_offset_x += 5
-                print(f"Adjusted debug offset to ({debug_offset_x}, {debug_offset_y})")
-            elif event.key == pygame.K_p:
-                save_calibration_points(calibration_points, offset_x, offset_y, debug_offset_x, debug_offset_y)
+
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
             if current_time - last_click_time >= CLICK_COOLDOWN:
                 mx, my = event.pos
                 point = np.float32([[[mx, my]]])
                 warped_point = cv2.perspectiveTransform(point, inv_transform_matrix)[0][0]
                 cx, cy = warped_point
-                if 0 <= cx <= SCREEN_WIDTH and 0 <= cy <= SCREEN_HEIGHT:
+                if 0 <= cx <= external_screen.width and 0 <= cy <= external_screen.height:
                     crack_x = int(cx - crack_img.get_width() / 2)
                     crack_y = int(cy - crack_img.get_height() / 2)
                     cracks.append(CrackEffect(crack_x, crack_y))

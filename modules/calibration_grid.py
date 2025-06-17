@@ -1,52 +1,20 @@
-# Calibration functions
 import cv2
 import numpy as np
-import time, json
-from screeninfo import get_monitors
+import time
+import json
+import os
+import logging
+from modules.config import *
+from modules.utils import order_points, calculate_distance, validate_quadrilateral
 
-# Constants
-CALIBRATION_FILE = "calibration.json"
-monitors = get_monitors()
-external_screen = monitors[1]
-SCREEN_WIDTH = 1360
-SCREEN_HEIGHT = 768
-
-def order_points(pts):
-    pts = np.array(pts, dtype=np.float32)
-    sorted_by_y = pts[np.argsort(pts[:, 1])]
-    top_points = sorted_by_y[:2]
-    bottom_points = sorted_by_y[2:]
-    top_left, top_right = top_points[np.argsort(top_points[:, 0])]
-    bottom_right, bottom_left = bottom_points[np.argsort(bottom_points[:, 0])[::-1]]
-    return np.array([top_left, top_right, bottom_right, bottom_left], dtype=np.float32)
-
-def calculate_distance(p1, p2):
-    return np.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
-
-def validate_quadrilateral(points):
-    if len(points) != 4:
-        return False, "Need exactly 4 points"
-    min_distance = 50
-    for i in range(len(points)):
-        for j in range(i + 1, len(points)):
-            if calculate_distance(points[i], points[j]) < min_distance:
-                return False, f"Points {i+1} and {j+1} are too close together"
-    ordered_points = order_points(points)
-    top_width = calculate_distance(ordered_points[0], ordered_points[1])
-    bottom_width = calculate_distance(ordered_points[3], ordered_points[2])
-    left_height = calculate_distance(ordered_points[0], ordered_points[3])
-    right_height = calculate_distance(ordered_points[1], ordered_points[2])
-    avg_width = (top_width + bottom_width) / 2
-    avg_height = (left_height + right_height) / 2
-    if avg_width == 0 or avg_height == 0:
-        return False, "Invalid dimensions"
-    aspect_ratio = avg_width / avg_height
-    expected_ratio = SCREEN_WIDTH / SCREEN_HEIGHT
-    if not (expected_ratio * 0.7 <= aspect_ratio <= expected_ratio * 1.3):
-        return False, f"Aspect ratio {aspect_ratio:.2f} doesn't match expected {expected_ratio:.2f}"
-    return True, "Valid quadrilateral"
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def get_calibration_points(cap, window_name="Calibration"):
+    if not cap.isOpened():
+        logger.error("Camera not accessible")
+        return None
     points = []
     selected_point = -1
     dragging = False
@@ -61,25 +29,25 @@ def get_calibration_points(cap, window_name="Calibration"):
             if len(points) < 4:
                 points.append([x, y])
                 selected_point = len(points) - 1
-                print(f"Point {len(points)} selected: ({x}, {y})")
+                logger.info(f"Point {len(points)} selected: ({x}, {y})")
         elif event == cv2.EVENT_MOUSEMOVE and dragging and selected_point >= 0:
             points[selected_point] = [x, y]
         elif event == cv2.EVENT_LBUTTONUP:
             dragging = False
             selected_point = -1
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(window_name, 1280, 720)
+    cv2.resizeWindow(window_name, CAMERA_WIDTH, CAMERA_HEIGHT)
     cv2.setMouseCallback(window_name, mouse_callback)
-    print("=== CALIBRATION INSTRUCTIONS ===")
-    print("1. Click EXACTLY on the four corners of the projector screen in the camera view")
-    print("2. Use the grid to align points precisely")
-    print("3. Drag points to adjust")
-    print("4. Points will be ordered: top-left, top-right, bottom-right, bottom-left")
-    print("5. Press 'r' to reset, 'c' to confirm, 'q' to quit")
+    logger.info("=== CALIBRATION INSTRUCTIONS ===")
+    logger.info("1. Click EXACTLY on the four corners of the projector screen in the camera view")
+    logger.info("2. Use the grid to align points precisely")
+    logger.info("3. Drag points to adjust")
+    logger.info("4. Points will be ordered: top-left, top-right, bottom-right, bottom-left")
+    logger.info("5. Press 'r' to reset, 'c' to confirm, 'q' to quit")
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Error: Could not read frame during calibration")
+            logger.error("Could not read frame during calibration")
             return None
         display_frame = frame.copy()
         height, width = display_frame.shape[:2]
@@ -120,20 +88,19 @@ def get_calibration_points(cap, window_name="Calibration"):
             return None
         elif key == ord('r'):
             points = []
-            print("Points reset")
+            logger.info("Points reset")
         elif key == ord('c'):
             if len(points) == 4:
                 is_valid, message = validate_quadrilateral(points)
                 if is_valid:
                     cv2.destroyWindow(window_name)
                     return order_points(points).tolist()
-                else:
-                    print(f"Cannot confirm: {message}")
 
-def save_calibration_points(points, offset_x=0, offset_y=0, debug_offset_x=0, debug_offset_y=0, filename=CALIBRATION_FILE):
+def save_calibration_points(points, segment_offsets, offset_x=0, offset_y=0, debug_offset_x=0, debug_offset_y=0, filename=CALIBRATION_FILE):
     try:
         calibration_data = {
             'points': points,
+            'segment_offsets': segment_offsets,
             'offset_x': offset_x,
             'offset_y': offset_y,
             'debug_offset_x': debug_offset_x,
@@ -145,60 +112,57 @@ def save_calibration_points(points, offset_x=0, offset_y=0, debug_offset_x=0, de
         }
         with open(filename, 'w') as f:
             json.dump(calibration_data, f, indent=2)
-        print(f"Calibration saved to {filename} with homography offset ({offset_x}, {offset_y}) and debug offset ({debug_offset_x}, {debug_offset_y})")
+        logger.info(f"Calibration saved to {filename}")
     except Exception as e:
-        print(f"Error saving calibration points: {e}")
+        logger.error(f"Error saving calibration points: {e}")
 
 def load_calibration_points(filename=CALIBRATION_FILE):
     try:
         with open(filename, 'r') as f:
             data = json.load(f)
-        if isinstance(data, list):
-            return data, 0, 0, 0, 0  # Backward compatibility
         if isinstance(data, dict) and 'points' in data:
+            version = data.get('version', '1.0')
+            if version != '2.2':
+                logger.warning(f"Calibration file version {version} may be incompatible with version 2.2")
             if data.get('screen_width') != SCREEN_WIDTH or data.get('screen_height') != SCREEN_HEIGHT:
-                print("Warning: Calibration was done for different screen dimensions")
-                return None, 0, 0, 0, 0
+                logger.warning("Calibration was done for different screen dimensions")
+                return None, [[(0, 0)] * GRID_COLS for _ in range(GRID_ROWS)], 0, 0, 0, 0
+            segment_offsets = data.get('segment_offsets', [[(0, 0)] * GRID_COLS for _ in range(GRID_ROWS)])
             offset_x = data.get('offset_x', 0)
             offset_y = data.get('offset_y', 0)
             debug_offset_x = data.get('debug_offset_x', 0)
             debug_offset_y = data.get('debug_offset_y', 0)
-            return data['points'], offset_x, offset_y, debug_offset_x, debug_offset_y
-        return None, 0, 0, 0, 0
+            return data['points'], segment_offsets, offset_x, offset_y, debug_offset_x, debug_offset_y
+        return None, [[(0, 0)] * GRID_COLS for _ in range(GRID_ROWS)], 0, 0, 0, 0
     except Exception as e:
-        print(f"Error loading calibration points: {e}")
-        return None, 0, 0, 0, 0
+        logger.error(f"Error loading calibration points: {e}")
+        return None, [[(0, 0)] * GRID_COLS for _ in range(GRID_ROWS)], 0, 0, 0, 0
 
-def get_perspective_transform(src_points, offset_x=0, offset_y=0):
+def get_perspective_transform(src_points, segment_offsets, offset_x=0, offset_y=0):
     dst_points = np.float32([
         [0 + offset_x, 0 + offset_y],
-        [external_screen.width-1 + offset_x, 0 + offset_y],
-        [external_screen.width-1 + offset_x, external_screen.height-1 + offset_y],
-        [0 + offset_x, external_screen.height-1 + offset_y]
+        [SCREEN_WIDTH-1 + offset_x, 0 + offset_y],
+        [SCREEN_WIDTH-1 + offset_x, SCREEN_HEIGHT-1 + offset_y],
+        [0 + offset_x, SCREEN_HEIGHT-1 + offset_y]
     ])
     src_points = np.float32(src_points)
     matrix = cv2.getPerspectiveTransform(src_points, dst_points)
-    print("=== CALIBRATION QUALITY ===")
+    logger.info("=== CALIBRATION QUALITY ===")
     for i, (src, dst) in enumerate(zip(src_points, dst_points)):
         transformed = cv2.perspectiveTransform(np.array([[src]], dtype=np.float32), matrix)[0][0]
         error = np.linalg.norm(transformed - dst)
-        print(f"Corner {i+1}: Error = {error:.2f} pixels")
+        logger.info(f"Corner {i+1}: Error = {error:.2f} pixels")
     return matrix
 
-def test_calibration_accuracy(transform_matrix, calibration_points):
-    print("\n=== TESTING CALIBRATION ACCURACY ===")
-    src_points = np.float32(calibration_points).reshape(-1, 1, 2)
-    transformed_points = cv2.perspectiveTransform(src_points, transform_matrix)
-    expected_points = np.float32([[0, 0], [SCREEN_WIDTH-1, 0], [SCREEN_WIDTH-1, SCREEN_HEIGHT-1], [0, SCREEN_HEIGHT-1]])
-    total_error = 0
-    for i, (expected, actual) in enumerate(zip(expected_points, transformed_points.reshape(-1, 2))):
-        error = np.linalg.norm(actual - expected)
-        total_error += error
-        print(f"Corner {i+1}: Expected {expected}, Got {actual}, Error: {error:.2f}px")
-    avg_error = total_error / 4
-    print(f"Average error: {avg_error:.2f} pixels")
-    if avg_error < 5: print("✓ Excellent calibration accuracy")
-    elif avg_error < 15: print("✓ Good calibration accuracy")
-    elif avg_error < 30: print("⚠ Moderate calibration accuracy - consider recalibrating")
-    else: print("✗ Poor calibration accuracy - recalibration recommended")
-    return avg_error
+def test_calibration_accuracy(transform_matrix, points):
+    dst_points = np.float32([
+        [0, 0],
+        [SCREEN_WIDTH-1, 0],
+        [SCREEN_WIDTH-1, SCREEN_HEIGHT-1],
+        [0, SCREEN_HEIGHT-1]
+    ])
+    logger.info("=== CALIBRATION ACCURACY TEST ===")
+    for i, (src, dst) in enumerate(zip(points, dst_points)):
+        transformed = cv2.perspectiveTransform(np.array([[src]], dtype=np.float32), transform_matrix)[0][0]
+        error = np.linalg.norm(transformed - dst)
+        logger.info(f"Corner {i+1}: Transformed = {transformed}, Expected = {dst}, Error = {error:.2f} pixels")
