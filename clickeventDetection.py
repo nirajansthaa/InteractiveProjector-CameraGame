@@ -140,8 +140,6 @@ while running:
                 cy = (y1 + y2) / 2
                 if (0 <= cx <= external_screen.width and 0 <= cy <= external_screen.height and 
                     current_time - last_click_time >= CLICK_COOLDOWN):
-                    # screen_x = int(cx + debug_offset_x)
-                    # screen_y = int(cy + debug_offset_y)
                     screen_x = int(cx + debug_offset_x + external_screen.x)
                     screen_y = int(cy + debug_offset_y + external_screen.y)
 
@@ -167,8 +165,8 @@ while running:
         if result.boxes:
             for box in result.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                cx = (x1 + x2) / 2 + debug_offset_x
-                cy = (y1 + y2) / 2 + debug_offset_y
+                cx = (x1 + x2) / 2
+                cy = (y1 + y2) / 2 
                 confidence = float(box.conf[0])
                 cv2.rectangle(debug_view, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.circle(debug_view, (int(cx), int(cy)), 5, (0, 0, 255), -1)
@@ -201,8 +199,8 @@ while running:
                 warped_point = cv2.perspectiveTransform(point, inv_transform_matrix)[0][0]
                 cx, cy = warped_point
                 if 0 <= cx <= external_screen.width and 0 <= cy <= external_screen.height:
-                    crack_x = int(cx - crack_img.get_width() / 2)
-                    crack_y = int(cy - crack_img.get_height() / 2)
+                    crack_x = int(mx - crack_img.get_width() / 2)
+                    crack_y = int(my - crack_img.get_height() / 2)
                     cracks.append(CrackEffect(crack_x, crack_y))
                     last_click_time = current_time
     # Render screen
@@ -220,11 +218,6 @@ while running:
                     pygame.draw.circle(screen, (255, 0, 0), (int(cx), int(cy)), 5)
                     pygame.draw.rect(screen, (0, 255, 0), (x1, y1, x2 - x1, y2 - y1), 2)
     
-    # Display offsets
-    offset_text = font.render(f"Homography Offset: ({offset_x}, {offset_y})", True, (255, 255, 255))
-    debug_offset_text = font.render(f"Debug Offset: ({debug_offset_x}, {debug_offset_y})", True, (255, 255, 255))
-    screen.blit(offset_text, (10, 10))
-    screen.blit(debug_offset_text, (10, 40))
     pygame.display.flip()
     
     # Check for exit

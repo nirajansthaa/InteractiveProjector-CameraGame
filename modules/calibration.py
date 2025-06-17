@@ -178,11 +178,11 @@ def get_perspective_transform(src_points, offset_x=0, offset_y=0):
     ])
     src_points = np.float32(src_points)
     matrix = cv2.getPerspectiveTransform(src_points, dst_points)
-    print("=== CALIBRATION QUALITY ===")
-    for i, (src, dst) in enumerate(zip(src_points, dst_points)):
-        transformed = cv2.perspectiveTransform(np.array([[src]], dtype=np.float32), matrix)[0][0]
-        error = np.linalg.norm(transformed - dst)
-        print(f"Corner {i+1}: Error = {error:.2f} pixels")
+    # print("=== CALIBRATION QUALITY ===")
+    # for i, (src, dst) in enumerate(zip(src_points, dst_points)):
+    #     transformed = cv2.perspectiveTransform(np.array([[src]], dtype=np.float32), matrix)[0][0]
+    #     error = np.linalg.norm(transformed - dst)
+    #     print(f"Corner {i+1}: Error = {error:.2f} pixels")
     return matrix
 
 def test_calibration_accuracy(transform_matrix, calibration_points):
